@@ -1,9 +1,12 @@
 import asyncio
 import logging
+import random
 from typing import List, Dict, Any
 import aiohttp
 import requests
 import pytz
+
+from wechat import send_wxpusher_message
 
 beijing_timezone = pytz.timezone('Asia/Shanghai')
 
@@ -68,8 +71,9 @@ async def get_new_token(token: str, refresh_token: str, proxy: str = None) -> Di
                 if response.status == 200:
                     return await response.json()
                 else:
+                    send_wxpusher_message(f'litas Error: {await response.text()}')
                     logging.error(f'Error: {await response.text()}')
-                    return None
+                    raise Exception(f'Error: {await response.text()}')
     except Exception as e:
         logging.error(f'Error: {str(e)}')
         return None
@@ -321,7 +325,7 @@ async def main():
 
         await write_accounts_to_file("tokens.txt", accounts)
         logging.info('All accounts processed, waiting 1 hour before next run...')
-        await delay(10 * 60)
+        await delay(random.randint(20, 40) * 60)
 
 if __name__ == "__main__":
     import time
