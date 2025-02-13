@@ -285,8 +285,10 @@ async def handle_farming(user_farm_info: Dict[str, Any], token: str,  refresh_to
         logging.info('Farming rewards claimed response:', claim_response)
         # await activate_mining_process(token, refresh_token,nick_name,  proxy)
         upgrade_mining_speed(token, nick_name)
+        return None
     else:
         logging.info('Farming rewards can be claimed at:' + can_be_claimed_at.astimezone(beijing_timezone).strftime('%Y-%m-%d %H:%M:%S'))
+        return can_be_claimed_at.timestamp() - time_now
 
 # 主函数
 async def main():
@@ -303,6 +305,7 @@ async def main():
     if len(proxies) == 0:
         logging.warn('No proxy found, running without proxy...')
     while True:
+        min_wait_seconds = None
         for i in range(len(accounts)):
             proxy = proxies[i % len(proxies)] if proxies else None
             account = accounts[i]
@@ -316,7 +319,12 @@ async def main():
                 access_token = user_farm_info_data.get('accessToken')
                 refresh_token = user_farm_info_data.get('refreshToken')
                 # await activate_mining_process(access_token, user_farm_info.get('nickName'), refresh_token, proxy)
-                await handle_farming(user_farm_info, access_token, refresh_token, nickname, proxy)
+                wait_seconds = await handle_farming(user_farm_info, access_token, refresh_token, nickname, proxy)
+                if wait_seconds is not None:
+                    if min_wait_seconds is None:
+                        min_wait_seconds = wait_seconds
+                    else:
+                        min_wait_seconds = min(min_wait_seconds, wait_seconds)
                 account['token'] = access_token
                 account['reToken'] = refresh_token
             except Exception as e:
@@ -324,8 +332,8 @@ async def main():
             await delay(3)
 
         await write_accounts_to_file("tokens.txt", accounts)
-        logging.info('All accounts processed, waiting 1 hour before next run...')
-        await delay(random.randint(20, 40) * 60)
+        logging.info(f'All accounts processed, waiting {min_wait_seconds}s before next run...')
+        await delay(min_wait_seconds)
 
 if __name__ == "__main__":
     import time
