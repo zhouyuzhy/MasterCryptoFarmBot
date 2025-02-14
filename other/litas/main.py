@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 import aiohttp
 import requests
 import pytz
+from dateutil.parser import parse
 
 from wechat import send_wxpusher_message
 
@@ -272,7 +273,7 @@ async def get_user_farm_info(access_token: str, refresh_token: str, nick_name: s
 
 # 处理挖矿的函数
 async def handle_farming(user_farm_info: Dict[str, Any], token: str,  refresh_token: str,nick_name:str, proxy: str = None):
-    can_be_claimed_at = datetime.datetime.fromisoformat(user_farm_info.get('canBeClaimedAt','').replace('Z', '+00:00'))
+    can_be_claimed_at = parse(user_farm_info.get('canBeClaimedAt',''))
     time_now = int(time.time())
     if can_be_claimed_at.timestamp() < time_now:
         logging.info('Farming rewards are claimable. Attempting to claim farming rewards...')
@@ -333,7 +334,10 @@ async def main():
 
         await write_accounts_to_file("tokens.txt", accounts)
         logging.info(f'All accounts processed, waiting {min_wait_seconds}s before next run...')
-        await delay(min_wait_seconds)
+        if min_wait_seconds:
+            await delay(min_wait_seconds)
+        else:
+            await delay(10 * 60)
 
 if __name__ == "__main__":
     import time
