@@ -124,10 +124,18 @@ def upgrade_mining_speed(token, nickname):
 
     try:
         response = requests.patch(url, headers=headers)
-        response.raise_for_status()  # 检查请求是否成功
-        return response.json()
+        if response.status == 200:
+            logging.info(f'upgrade success {response.text()}')
+            return response.text()
+        elif response.status == 401:
+            return "unauth"
+        elif response.status == 409:
+            return f"insufficient balance {response.text()}"
+        else:
+            logging.error(f'Error: {response.text()}')
+            return None
     except requests.RequestException as e:
-        print(f"请求发生错误: {e}")
+        logging.error(f"请求发生错误: {e}")
         return None
 
 # 模拟激活挖矿的函数
@@ -181,8 +189,8 @@ async def claim_mining(token: str, nickname: str, proxy: str = None) -> Dict[str
     try:
         async with aiohttp.ClientSession() as session:
             async with session.patch(url, headers=headers) as response:
-                if response.status == 200:
-                    return await response.json()
+                if 200 <= response.status < 300:
+                    return 'success'
                 elif response.status == 401:
                     return "unauth"
                 elif response.status == 409:
@@ -224,13 +232,11 @@ def get_antiforgery_token(token):
 
 # 刷新访问令牌的函数
 async def refresh_access_token(token: str, refresh_token: str, proxy: str = None) -> Dict[str, Any]:
-    refresh = None
-    while not refresh:
-        refresh = await get_new_token(token, refresh_token, proxy)
-        if not refresh:
-            logging.info('Token refresh failed, retrying...')
-            await delay(3)
-    logging.info('Token refreshed succesfully', refresh)
+    refresh = await get_new_token(token, refresh_token, proxy)
+    if not refresh:
+        logging.info('Token refresh failed, retrying...')
+        await delay(3)
+    logging.info('Token refreshed succesfully' +refresh)
     return refresh
 #
 # # 激活挖矿流程的函数
@@ -251,17 +257,15 @@ async def refresh_access_token(token: str, refresh_token: str, proxy: str = None
 
 # 获取用户农场信息的函数
 async def get_user_farm_info(access_token: str, refresh_token: str, nick_name: str, proxy: str = None, index: int = 1) -> Dict[str, Any]:
-    user_farm_info = None
-    while not user_farm_info:
-        logging.warn(f'Account {index}, refreshing token...')
+    logging.warn(f'Account {index}, refreshing token...')
 
-        user_farm_info = await get_user_farm(access_token)
-        if not user_farm_info:
-            logging.warn(f'Account {index} get farm info failed, retrying...')
-            refreshed_tokens = await refresh_access_token(access_token, refresh_token, proxy)
-            access_token = refreshed_tokens.get('accessToken')
-            refresh_token = refreshed_tokens.get('refreshToken')
-            await delay(3)
+    user_farm_info = await get_user_farm(access_token)
+    if not user_farm_info:
+        logging.warn(f'Account {index} get farm info failed, retrying...')
+        refreshed_tokens = await refresh_access_token(access_token, refresh_token, proxy)
+        access_token = refreshed_tokens.get('accessToken')
+        refresh_token = refreshed_tokens.get('refreshToken')
+        await delay(3)
     status = user_farm_info.get('status')
     total_mined = user_farm_info.get('totalMined')
     logging.info(f'Account {index} {nick_name} farm info: status: {status}, totalMined: {total_mined}')
@@ -277,13 +281,11 @@ async def handle_farming(user_farm_info: Dict[str, Any], token: str,  refresh_to
     time_now = int(time.time())
     if can_be_claimed_at.timestamp() < time_now:
         logging.info('Farming rewards are claimable. Attempting to claim farming rewards...')
-        claim_response = None
-        while not claim_response:
-            claim_response = await claim_mining(token,nick_name,proxy)
-            if not claim_response:
-                logging.info('Failed to claim farming rewards, retrying...')
-                await delay(3)
-        logging.info('Farming rewards claimed response:', claim_response)
+        claim_response = await claim_mining(token,nick_name,proxy)
+        if not claim_response:
+            logging.info('Failed to claim farming rewards, retrying...')
+            await delay(3)
+        logging.info('Farming rewards claimed response:' + claim_response)
         # await activate_mining_process(token, refresh_token,nick_name,  proxy)
         upgrade_mining_speed(token, nick_name)
         return None
@@ -337,7 +339,7 @@ async def main():
         if min_wait_seconds:
             await delay(min_wait_seconds)
         else:
-            await delay(10 * 60)
+            await delay(60 * 60)
 
 if __name__ == "__main__":
     import time
