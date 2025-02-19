@@ -287,7 +287,7 @@ async def handle_farming(user_farm_info: Dict[str, Any], token: str,  refresh_to
             await delay(3)
         logging.info('Farming rewards claimed response:' + claim_response)
         # await activate_mining_process(token, refresh_token,nick_name,  proxy)
-        upgrade_mining_speed(token, nick_name)
+        # upgrade_mining_speed(token, nick_name)
         return None
     else:
         logging.info('Farming rewards can be claimed at:' + can_be_claimed_at.astimezone(beijing_timezone).strftime('%Y-%m-%d %H:%M:%S'))
